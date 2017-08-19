@@ -20,4 +20,13 @@ func (e *GlueExtension) Process(message interface{}, from *xmpp.Client) {
 			from.Send(msg)
 		}
 	}
+	if ok && parsed.Type == "get" && len(parsed.Query) > 0 {
+		if strings.TrimSpace(string(parsed.Query)) == `<query xmlns="http://jabber.org/protocol/disco#info"/>` {
+			msg := "<iq type='result' from='talexmpp' id=''" + parsed.ID + "'>"
+			msg = msg + "<query xmlns='http://jabber.org/protocol/disco#info'>"
+			msg = msg + "<feature var='http://jabber.org/protocol/disco#info'/>"
+			msg = msg + "</query></iq>"
+			from.Send(msg)
+		}
+	}
 }

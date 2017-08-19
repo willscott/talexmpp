@@ -2,6 +2,7 @@ package xmpp
 
 import (
 	"fmt"
+	"log"
 	"strings"
 )
 
@@ -12,12 +13,11 @@ type Extension interface {
 
 // DebugExtension just dumps data
 type DebugExtension struct {
-	Log Logging
 }
 
 // Process a message (write to debug logger)
 func (e *DebugExtension) Process(message interface{}, from *Client) {
-	e.Log.Debug(fmt.Sprintf("Processing message: %s", message))
+	log.Printf("Processing message: %s", message)
 }
 
 // NormalMessageExtension handles client messages

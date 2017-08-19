@@ -55,11 +55,9 @@ func main() {
 	}
 
 	xmppServer := &xmpp.Server{
-		Log:        Logger{info: true, debug: false},
 		Accounts:   am,
 		ConnectBus: connectbus,
 		Extensions: []xmpp.Extension{
-			&xmpp.DebugExtension{Log: Logger{info: true, debug: true}},
 			&xmpp.NormalMessageExtension{MessageBus: messagebus},
 			&xmpp.RosterExtension{Accounts: am},
 			&GlueExtension{},

@@ -3,8 +3,7 @@ package xmpp
 import (
 	"crypto/tls"
 	"encoding/base64"
-	"errors"
-	"fmt"
+	"log"
 	"strings"
 )
 
@@ -110,20 +109,20 @@ func (state *TLSAuth) Process(c *Connection, client *Client, s *Server) (State, 
 	// read the full auth stanza
 	_, val, err := c.Read(se)
 	if err != nil {
-		s.Log.Error(errors.New("Unable to read auth stanza").Error())
+		log.Printf("Unable to read auth stanza")
 		return nil, c, err
 	}
 	switch v := val.(type) {
 	case *saslAuth:
-		data, err := base64.StdEncoding.DecodeString(v.Body)
-		if err != nil {
-			return nil, c, err
+		data, decodeerr := base64.StdEncoding.DecodeString(v.Body)
+		if decodeerr != nil {
+			return nil, c, decodeerr
 		}
 		info := strings.Split(string(data), "\x00")
 		// should check that info[1] starts with client.jid
-		success, err := s.Accounts.Authenticate(info[1], info[2])
-		if err != nil {
-			return nil, c, err
+		success, autherr := s.Accounts.Authenticate(info[1], info[2])
+		if autherr != nil {
+			return nil, c, autherr
 		}
 		if success {
 			client.localpart = info[1]
@@ -133,7 +132,7 @@ func (state *TLSAuth) Process(c *Connection, client *Client, s *Server) (State, 
 		}
 	default:
 		// expected authentication
-		s.Log.Error(errors.New("Expected authentication").Error())
+		log.Printf("Expected authentication")
 		return nil, c, err
 	}
 	return state.Next, c, nil
@@ -188,7 +187,7 @@ func (state *AuthedStream) Process(c *Connection, client *Client, s *Server) (St
 
 		s.ConnectBus <- Connect{Jid: client.jid, Receiver: client.messages}
 	default:
-		s.Log.Error(errors.New("Expected ClientIQ message").Error())
+		log.Printf("Expected ClientIQ message")
 		return nil, c, err
 	}
 	return state.Next, c, nil
@@ -206,9 +205,9 @@ func (state *Normal) Process(c *Connection, client *Client, s *Server) (State, *
 	// one go routine to read/respond
 	go func(done chan bool, errors chan error) {
 		for {
-			se, err := c.Next()
-			if err != nil {
-				errors <- err
+			se, readerr := c.Next()
+			if readerr != nil {
+				errors <- readerr
 				done <- true
 				return
 			}
@@ -235,7 +234,7 @@ func (state *Normal) Process(c *Connection, client *Client, s *Server) (State, *
 		case <-readDone:
 			return nil, c, nil
 		case err := <-errors:
-			s.Log.Error(fmt.Sprintf("Connection Error: %s", err.Error()))
+			log.Printf("Connection Error: %s", err.Error())
 		}
 	}
 }

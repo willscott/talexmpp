@@ -9,6 +9,7 @@ import (
 	"sync"
 )
 
+// AccountManager deals with understanding the local set of talek logs in use and remote users
 type AccountManager struct {
 	Online  map[string]chan<- interface{}
 	Backend *libtalek.Client

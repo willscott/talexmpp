@@ -8,7 +8,7 @@ package xmpp
 
 import (
 	"crypto/tls"
-	"fmt"
+	"log"
 	"net"
 )
 
@@ -21,10 +21,12 @@ type Client struct {
 	messages     chan interface{}
 }
 
+// Jid returns the identity of this client
 func (c *Client) Jid() string {
 	return c.jid
 }
 
+// Send delivers a message to this client
 func (c *Client) Send(msg interface{}) {
 	c.messages <- msg
 }
@@ -34,13 +36,6 @@ type AccountManager interface {
 	Authenticate(username, password string) (success bool, err error)
 	CreateAccount(username, password string) (success bool, err error)
 	OnlineRoster(jid string) (online []string, err error)
-}
-
-// Logging interface for library messages
-type Logging interface {
-	Debug(string) error
-	Info(string) error
-	Error(string) error
 }
 
 // Server contains options for an XMPP connection.
@@ -68,9 +63,6 @@ type Server struct {
 
 	// notify server that the client has disconnected
 	DisconnectBus chan<- Disconnect
-
-	// Injectable logging interface
-	Log Logging
 }
 
 // Message is a generic XMPP message to send to the To Jid
@@ -95,7 +87,7 @@ func (s *Server) TCPAnswer(conn net.Conn) {
 	defer conn.Close()
 	var err error
 
-	s.Log.Info(fmt.Sprintf("Accepting TCP connection from: %s", conn.RemoteAddr()))
+	log.Printf("Accepting TCP connection from: %s", conn.RemoteAddr())
 
 	state := NewTLSStateMachine()
 	client := &Client{messages: make(chan interface{})}
@@ -105,14 +97,14 @@ func (s *Server) TCPAnswer(conn net.Conn) {
 
 	for {
 		state, clientConnection, err = state.Process(clientConnection, client, s)
-		s.Log.Debug(fmt.Sprintf("[state] %s", state))
+		//s.Log.Debug(fmt.Sprintf("[state] %s", state))
 
 		if err != nil {
-			s.Log.Error(fmt.Sprintf("[%s] State Error: %s", client.jid, err.Error()))
+			log.Printf("[%s] State Error: %s", client.jid, err.Error())
 			return
 		}
 		if state == nil {
-			s.Log.Info(fmt.Sprintf("Client Disconnected: %s", client.jid))
+			log.Printf("Client Disconnected: %s", client.jid)
 			s.DisconnectBus <- Disconnect{Jid: client.jid}
 			return
 		}
