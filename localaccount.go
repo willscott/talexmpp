@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	"./xmpp"
 	"github.com/privacylab/talek/libtalek"
@@ -16,17 +17,19 @@ type AccountManager struct {
 	lock    *sync.Mutex
 }
 
+// Authenticate called when local user attempts to authenticate
 func (a AccountManager) Authenticate(username, password string) (success bool, err error) {
 	success = true
 	return
 }
 
+// CreateAccount called when local iser attempts to register
 func (a AccountManager) CreateAccount(username, password string) (success bool, err error) {
 	success = true
 	return
 }
 
-// called periodically by client.
+// OnlineRoster is called periodically by client
 func (a AccountManager) OnlineRoster(jid string) (online []string, err error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
@@ -34,7 +37,6 @@ func (a AccountManager) OnlineRoster(jid string) (online []string, err error) {
 	for person := range a.Online {
 		online = append(online, person)
 	}
-	online = append(online, "Status@talexmpp.local/bot")
 	return
 }
 
@@ -61,7 +63,8 @@ func (a AccountManager) connectRoutine(bus <-chan xmpp.Connect) {
 	for {
 		message := <-bus
 		a.lock.Lock()
-		a.Online[message.Jid] = message.Receiver
+		localPart := strings.SplitN(message.Jid, "@", 1)
+		a.Online[localPart[0]] = message.Receiver
 		a.lock.Unlock()
 	}
 }
@@ -87,21 +90,15 @@ func handleMessagesTo(jid string) chan interface{} {
 	return iface
 }
 
+// RosterManagementExtension watches for messages outbound from client.
 type RosterManagementExtension struct {
 	Accounts AccountManager
 }
 
+// Process takes in messages
 func (e *RosterManagementExtension) Process(message interface{}, from *xmpp.Client) {
 	parsed, ok := message.(*xmpp.ClientPresence)
 	if ok {
-		fmt.Printf("Saw client preence: %v\n", parsed)
-	}
-	if ok && parsed.Type == "subscribe" {
-		e.Accounts.Online[parsed.To] = handleMessagesTo(parsed.To)
-		fmt.Printf("Saw Subscribe :%v\n", parsed)
-	}
-	iqparse, ok := message.(*xmpp.ClientIQ)
-	if ok && iqparse.Type == "get" {
-		fmt.Printf("saw iq req: %s\n", iqparse.Query)
+		fmt.Printf("Saw client presence: %v\n", parsed)
 	}
 }

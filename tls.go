@@ -34,6 +34,7 @@ func pemBlockForKey(priv interface{}) *pem.Block {
 	}
 }
 
+// MakeSelfSignedCert creates a cert for the local shim
 func MakeSelfSignedCert() {
 	var priv interface{}
 	var err error

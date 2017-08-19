@@ -51,7 +51,7 @@ func (e *RosterExtension) Process(message interface{}, from *Client) {
 		roster, _ := e.Accounts.OnlineRoster(from.jid)
 		msg := "<iq id='" + parsed.ID + "' to='" + parsed.From + "' type='result'><query xmlns='jabber:iq:roster' ver='ver7'>"
 		for _, v := range roster {
-			msg = msg + "<item jid='" + v + "'/>"
+			msg = msg + "<item jid='" + v + "@talexmpp' name='" + v + "'/>"
 		}
 		msg = msg + "</query></iq>"
 

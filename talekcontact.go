@@ -8,6 +8,7 @@ type TalekContact struct {
 	TheirHandle *libtalek.Handle
 }
 
+// GetOffer makes a local contact / handle as text for a remote contact.
 func GetOffer() (*TalekContact, []byte) {
 	contact := new(TalekContact)
 	var err error
@@ -22,6 +23,7 @@ func GetOffer() (*TalekContact, []byte) {
 	return contact, offer
 }
 
+// CompleteOffer resolves a remote contact's stream.
 func (t *TalekContact) CompleteOffer(other []byte) bool {
 	if t.TheirHandle != nil {
 		return false
