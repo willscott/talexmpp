@@ -49,7 +49,7 @@ func (e *RosterExtension) Process(message interface{}, from *Client) {
 		string(parsed.Query) == "<query xmlns='jabber:iq:roster' ></query>") {
 		// respond with roster
 		roster, _ := e.Accounts.OnlineRoster(from.jid)
-		msg := "<iq id='" + parsed.ID + "' to='" + parsed.From + "' type='result'><query xmlns='jabber:iq:roster' ver='ver7'>"
+		msg := "<iq id='" + parsed.ID + "' to='" + from.jid + "' type='result'><query xmlns='jabber:iq:roster' ver='ver7'>"
 		for _, v := range roster {
 			msg = msg + "<item jid='" + v + "@talexmpp' name='" + v + "'/>"
 		}
@@ -57,6 +57,6 @@ func (e *RosterExtension) Process(message interface{}, from *Client) {
 
 		fmt.Printf("sending back roster.\n")
 		// respond to client
-		from.messages <- msg
+		from.messages <- []byte(msg)
 	}
 }

@@ -72,8 +72,8 @@ func (c *Connection) SendStanza(s interface{}) error {
 }
 
 // SendRaw sends the string across the connection
-func (c *Connection) SendRaw(s string) error {
-	_, err := c.Raw.Write([]byte(s))
+func (c *Connection) SendRaw(s []byte) error {
+	_, err := c.Raw.Write(s)
 	return err
 }
 

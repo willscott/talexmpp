@@ -18,6 +18,9 @@ type TalekContact struct {
 	MyTopic     *libtalek.Topic
 	TheirHandle *libtalek.Handle
 	state       talekContactState
+	outgoing    chan []byte   //msgs from local user to the contact
+	incoming    *func([]byte) //msgs from contact to local user
+	done        chan byte
 }
 
 // GetOffer makes a local contact / handle as text for a remote contact.
@@ -88,4 +91,45 @@ func AcceptOffer(offer []byte, client *libtalek.Client) *TalekContact {
 	}
 
 	return contact
+}
+
+func (t *TalekContact) onMessage(data []byte) bool {
+	if t.state == offerGenerated {
+		t.TheirHandle = &libtalek.Handle{}
+		if err := t.TheirHandle.UnmarshalText(data); err != nil {
+			panic(err)
+		}
+		t.state = confirmed
+		return true
+	} else if t.state == answerSent {
+		t.state = confirmed
+		return true
+	}
+	return false
+}
+
+func (t *TalekContact) Channel(incoming *func([]byte)) chan<- []byte {
+	t.incoming = incoming
+	return t.outgoing
+}
+
+func (t *TalekContact) Start(c *libtalek.Client) {
+	incoming := c.Poll(t.TheirHandle)
+
+	t.outgoing = make(chan []byte)
+
+	go (func() {
+		for {
+			select {
+			case msg := <-incoming:
+				if !t.onMessage(msg) && t.incoming != nil {
+					(*t.incoming)(msg)
+				}
+			case msg := <-t.outgoing:
+				c.Publish(t.MyTopic, msg)
+			case <-t.done:
+				return
+			}
+		}
+	})()
 }

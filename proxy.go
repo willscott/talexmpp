@@ -25,7 +25,7 @@ func main() {
 	}
 	defer listener.Close()
 
-	var contacts = make(map[string]chan<- interface{})
+	var contacts = make(map[string]chan<- []byte)
 	var messagebus = make(chan xmpp.Message)
 	var connectbus = make(chan xmpp.Connect)
 	var disconnectbus = make(chan xmpp.Disconnect)
@@ -61,7 +61,7 @@ func main() {
 			&xmpp.NormalMessageExtension{MessageBus: messagebus},
 			&xmpp.RosterExtension{Accounts: am},
 			&GlueExtension{},
-			&RosterManagementExtension{Accounts: am},
+			&RosterManagementExtension{Accounts: am, Client: backend},
 		},
 		DisconnectBus: disconnectbus,
 		Domain:        "localhost",

@@ -18,7 +18,7 @@ type Client struct {
 	localpart    string
 	domainpart   string
 	resourcepart string
-	messages     chan interface{}
+	messages     chan []byte
 }
 
 // Jid returns the identity of this client
@@ -27,7 +27,7 @@ func (c *Client) Jid() string {
 }
 
 // Send delivers a message to this client
-func (c *Client) Send(msg interface{}) {
+func (c *Client) Send(msg []byte) {
 	c.messages <- msg
 }
 
@@ -74,7 +74,7 @@ type Message struct {
 // Connect holds a channel where the server can send messages to the specific Jid
 type Connect struct {
 	Jid      string
-	Receiver chan<- interface{}
+	Receiver chan<- []byte
 }
 
 // Disconnect notifies when a jid disconnects
@@ -90,7 +90,7 @@ func (s *Server) TCPAnswer(conn net.Conn) {
 	log.Printf("Accepting TCP connection from: %s", conn.RemoteAddr())
 
 	state := NewTLSStateMachine()
-	client := &Client{messages: make(chan interface{})}
+	client := &Client{messages: make(chan []byte)}
 	defer close(client.messages)
 
 	clientConnection := NewConn(conn, MessageTypes)

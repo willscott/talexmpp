@@ -38,7 +38,7 @@ func (state *Start) Process(c *Connection, client *Client, s *Server) (State, *C
 	}
 	// TODO: check that se is a stream
 	c.SendRawf("<?xml version='1.0'?><stream:stream id='%x' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'>", createCookie())
-	c.SendRaw("<stream:features><starttls xmlns='urn:ietf:params:xml:ns:xmpp-tls'><required/></starttls></stream:features>")
+	c.SendRaw([]byte("<stream:features><starttls xmlns='urn:ietf:params:xml:ns:xmpp-tls'><required/></starttls></stream:features>"))
 	return state.Next, c, nil
 }
 
@@ -64,7 +64,7 @@ type TLSUpgrade struct {
 
 // Process message
 func (state *TLSUpgrade) Process(c *Connection, client *Client, s *Server) (State, *Connection, error) {
-	c.SendRaw("<proceed xmlns='urn:ietf:params:xml:ns:xmpp-tls'/>")
+	c.SendRaw([]byte("<proceed xmlns='urn:ietf:params:xml:ns:xmpp-tls'/>"))
 	// perform the TLS handshake
 	tlsConn := tls.Server(c.Raw, s.TLSConfig)
 	err := tlsConn.Handshake()
@@ -89,7 +89,7 @@ func (state *TLSStartStream) Process(c *Connection, client *Client, s *Server) (
 	}
 	// TODO: ensure check that se is a stream
 	c.SendRawf("<?xml version='1.0'?><stream:stream id='%x' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'>", createCookie())
-	c.SendRaw("<stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>PLAIN</mechanism></mechanisms></stream:features>")
+	c.SendRaw([]byte("<stream:features><mechanisms xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><mechanism>PLAIN</mechanism></mechanisms></stream:features>"))
 	return state.Next, c, nil
 }
 
@@ -126,9 +126,9 @@ func (state *TLSAuth) Process(c *Connection, client *Client, s *Server) (State, 
 		}
 		if success {
 			client.localpart = info[1]
-			c.SendRaw("<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>")
+			c.SendRaw([]byte("<success xmlns='urn:ietf:params:xml:ns:xmpp-sasl'/>"))
 		} else {
-			c.SendRaw("<failure xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><not-authorized/></failure>")
+			c.SendRaw([]byte("<failure xmlns='urn:ietf:params:xml:ns:xmpp-sasl'><not-authorized/></failure>"))
 		}
 	default:
 		// expected authentication
@@ -150,7 +150,7 @@ func (state *AuthedStart) Process(c *Connection, client *Client, s *Server) (Sta
 		return nil, c, err
 	}
 	c.SendRawf("<?xml version='1.0'?><stream:stream id='%x' version='1.0' xmlns='jabber:client' xmlns:stream='http://etherx.jabber.org/streams'>", createCookie())
-	c.SendRaw("<stream:features><bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'/></stream:features>")
+	c.SendRaw([]byte("<stream:features><bind xmlns='urn:ietf:params:xml:ns:xmpp-bind'/></stream:features>"))
 	return state.Next, c, nil
 }
 
@@ -222,12 +222,8 @@ func (state *Normal) Process(c *Connection, client *Client, s *Server) (State, *
 	for {
 		select {
 		case msg := <-client.messages:
-			switch msg.(type) {
-			default:
-				err = c.SendStanza(msg)
-			case string:
-				err = c.SendRaw(msg.(string))
-			}
+			err = c.SendRaw(msg)
+
 			if err != nil {
 				errors <- err
 			}
