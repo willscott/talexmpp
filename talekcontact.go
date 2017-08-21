@@ -1,6 +1,10 @@
 package main
 
-import "github.com/privacylab/talek/libtalek"
+import (
+	"encoding/json"
+
+	"github.com/privacylab/talek/libtalek"
+)
 
 type talekContactState int
 
@@ -15,6 +19,8 @@ const (
 
 // TalekContact represents a bidirectional message channel with another user.
 type TalekContact struct {
+	MyNick      string
+	TheirName   string
 	MyTopic     *libtalek.Topic
 	TheirHandle *libtalek.Handle
 	state       talekContactState
@@ -23,12 +29,20 @@ type TalekContact struct {
 	done        chan byte
 }
 
+type talekOffer struct {
+	fromNick   string
+	readHandle string
+	writeTopic string
+}
+
 // GetOffer makes a local contact / handle as text for a remote contact.
 // the offer contains:
 // * A handle for reading messages from me
 // * A topic I'll read one msg off of with info on your handle.
-func GetOffer() (*TalekContact, []byte) {
+func GetOffer(myName, theirName string) (*TalekContact, []byte) {
 	contact := new(TalekContact)
+	contact.MyNick = myName
+	contact.TheirName = theirName
 	contact.state = offerGenerated
 	var err error
 	contact.MyTopic, err = libtalek.NewTopic()
@@ -50,12 +64,18 @@ func GetOffer() (*TalekContact, []byte) {
 		panic(err)
 	}
 
-	return contact, append(theirTopic, myHandle...)
+	offer, err := json.Marshal(talekOffer{fromNick: myName, readHandle: string(myHandle), writeTopic: string(theirTopic)})
+	if err != nil {
+		panic(err)
+	}
+
+	return contact, offer
 }
 
 // AcceptOffer resolves a remote contact's stream.
-func AcceptOffer(offer []byte, client *libtalek.Client) *TalekContact {
+func AcceptOffer(myName string, offer []byte, client *libtalek.Client) *TalekContact {
 	contact := new(TalekContact)
+	contact.MyNick = myName
 	contact.state = answerSent
 	var err error
 	contact.MyTopic, err = libtalek.NewTopic()
@@ -63,21 +83,19 @@ func AcceptOffer(offer []byte, client *libtalek.Client) *TalekContact {
 		panic(err)
 	}
 
-	// Learn how long a serialized topic is:
-	rendezvous, err := contact.MyTopic.MarshalText()
-	if err != nil {
+	// Deserialize
+	offerstruct := talekOffer{}
+	if err = json.Unmarshal(offer, &offerstruct); err != nil {
 		panic(err)
 	}
-	topicLen := len(rendezvous)
 
-	// Deserialize
 	rendezvousTopic := libtalek.Topic{}
-	if err = rendezvousTopic.UnmarshalText(offer[0:topicLen]); err != nil {
+	if err = rendezvousTopic.UnmarshalText([]byte(offerstruct.writeTopic)); err != nil {
 		panic(err)
 	}
 
 	contact.TheirHandle = &libtalek.Handle{}
-	if err = contact.TheirHandle.UnmarshalText(offer[topicLen:]); err != nil {
+	if err = contact.TheirHandle.UnmarshalText([]byte(offerstruct.readHandle)); err != nil {
 		panic(err)
 	}
 
@@ -89,6 +107,7 @@ func AcceptOffer(offer []byte, client *libtalek.Client) *TalekContact {
 	if err = client.Publish(&rendezvousTopic, myHandle); err != nil {
 		panic(err)
 	}
+	contact.TheirName = offerstruct.fromNick
 
 	return contact
 }
@@ -108,15 +127,19 @@ func (t *TalekContact) onMessage(data []byte) bool {
 	return false
 }
 
+// Channel connects ingoing / outgoing message streams for a running contact.
 func (t *TalekContact) Channel(incoming *func([]byte)) chan<- []byte {
 	t.incoming = incoming
 	return t.outgoing
 }
 
+// Start begins polling a contact for messages, and watching for those to send
 func (t *TalekContact) Start(c *libtalek.Client) {
-	incoming := c.Poll(t.TheirHandle)
+	curHandle := t.TheirHandle
+	incoming := c.Poll(curHandle)
 
 	t.outgoing = make(chan []byte)
+	t.done = make(chan byte, 1)
 
 	go (func() {
 		for {
@@ -124,12 +147,24 @@ func (t *TalekContact) Start(c *libtalek.Client) {
 			case msg := <-incoming:
 				if !t.onMessage(msg) && t.incoming != nil {
 					(*t.incoming)(msg)
+				} else if t.TheirHandle != curHandle {
+					c.Done(curHandle)
+					curHandle = t.TheirHandle
+					incoming = c.Poll(t.TheirHandle)
 				}
 			case msg := <-t.outgoing:
 				c.Publish(t.MyTopic, msg)
 			case <-t.done:
+				t.outgoing = nil
 				return
 			}
 		}
 	})()
+}
+
+// Done cleans up a running contact
+func (t *TalekContact) Done() {
+	if t.outgoing != nil {
+		t.done <- 1
+	}
 }

@@ -37,6 +37,8 @@ func main() {
 	leader := talekcommon.NewFrontendRPC("rpc", talekconf.FrontendAddr)
 	backend := libtalek.NewClient("talexmpp", *talekconf, leader)
 
+	// restore from saved contact state
+
 	am := AccountManager{Online: contacts, Backend: backend, lock: &sync.Mutex{}}
 
 	if _, err := os.Stat("./cert.pem"); err != nil && os.IsNotExist(err) {

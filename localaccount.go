@@ -35,6 +35,8 @@ func (a AccountManager) OnlineRoster(jid string) (online []string, err error) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
 
+	// For status
+	online = append(online, "status")
 	for person := range a.Online {
 		online = append(online, person)
 	}
@@ -113,18 +115,40 @@ func (e *RosterManagementExtension) Process(message interface{}, from *xmpp.Clie
 	parsedPresence, ok := message.(*xmpp.ClientPresence)
 	if ok && parsedPresence.Type != "subscribe" {
 		fmt.Printf("Saw client presence: %v\n", parsedPresence)
-
+		from.Send([]byte("<presence from='status@talexmpp'><priority>1</priority></presence>"))
 		for person := range e.Accounts.Online {
 			from.Send([]byte("<presence from='" + person + "@talexmpp/talek' to='" + from.Jid() + "' />"))
 		}
 	} else if ok {
 		// Initiate Contact addition.
-		contact, offer := GetOffer()
+		//TODO: parse <nick> from subscription request
+		contact, offer := GetOffer("nickname", parsedPresence.To)
 		contact.Start(e.Client)
-		sender := from.Send
+		sender := func(msg []byte) {
+			wrapped := fmt.Sprintf("<message from='%s@talexmpp/talek' type='chat'><body>%s</body></message>", parsedPresence.To, msg)
+			from.Send([]byte(wrapped))
+		}
 		fromUser := contact.Channel(&sender)
 		e.Accounts.Online[parsedPresence.To] = fromUser
-		from.Send([]byte("<message from='" + parsedPresence.To + "' type='chat'><body>" + string(offer) + "</body></message>"))
+		from.Send([]byte("<message from='status@talexmpp' type='chat'><body>Contact generated. Offer:\n" + string(offer) + "</body></message>"))
+	}
 
+	parsedMessage, ok := message.(*xmpp.ClientMessage)
+	if ok && parsedMessage.To == "status@talexmpp" {
+		// accept contact offer.
+		offer := parsedMessage.Body
+		// TODO: parse name from config or local contact
+		contact := AcceptOffer("nickname", []byte(offer), e.Client)
+		if contact == nil {
+			from.Send([]byte("<message from='status@talexmpp' type='chat'><body>Failed to accept offer.</body></message>"))
+			return
+		}
+		contact.Start(e.Client)
+		sender := func(msg []byte) {
+			wrapped := fmt.Sprintf("<message from='%s@talexmpp/talek' type='chat'><body>%s</body></message>", contact.TheirName, msg)
+			from.Send([]byte(wrapped))
+		}
+		fromUser := contact.Channel(&sender)
+		e.Accounts.Online[contact.TheirName] = fromUser
 	}
 }
