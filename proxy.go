@@ -19,7 +19,7 @@ func main() {
 
 	flag.Parse()
 
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", *serverPort))
+	listener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", *serverPort))
 	if err != nil {
 		panic(err)
 	}
